@@ -1,0 +1,55 @@
+# Variant with its own Postgres container.
+# Variant with wwn Postgres server: docker-compose.yml.
+
+# Copy to docker-compose.yml, .env.with-postgres.example to .env
+# (variables and how they match this file are explained there).
+services:
+  db:
+    image: postgres:18
+    env_file: .env  # reads POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+    volumes:
+      - ./pgdata:/var/lib/postgresql  # PG 18+ image: mount the parent dir, data lives in 18/docker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ${PATMAS_APP_IMAGE}  # digest from the publish run summary; .env.with-postgres.example, docs/OPERATIONS.md "Build"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"  # reachable only through the reverse proxy on this host, never directly
+    env_file: .env  # reads QUARKUS_DATASOURCE_*, PATMAS_*
+    environment:
+      # one file-system backend "local" for every flow (docs/DOCUMENTS.md "Configuration")
+      PATMAS_STORAGE_BACKENDS_LOCAL_TYPE: fs
+      PATMAS_STORAGE_BACKENDS_LOCAL_FS_ROOT: /storage
+      PATMAS_STORAGE_ROUTES_DEFAULT: local
+      # The host's reverse proxy reaches the app through the published port, so the app sees the network's gateway
+      # (subnet pinned below) as peer; only it may set X-Forwarded-* (application.properties, proxy forwarding).
+      QUARKUS_HTTP_PROXY_TRUSTED_PROXIES: 172.30.0.1
+      # ./extensions next to this file, mounted below. /opt/patmas/extensions is inside the container
+      # (docs/OPERATIONS.md "Extension scripts"). Read once at startup.
+      PATMAS_EXTENSIONS_SCRIPTS_PATH: /opt/patmas/extensions
+      # ./document-templates next to this file, mounted below: the template share (docs/OPERATIONS.md "Template share").
+      PATMAS_TEMPLATES_ROOT: /opt/patmas/document-templates
+    volumes:
+      - ./storage:/storage  # document files; must be writable by uid 185
+      - ./extensions:/opt/patmas/extensions:ro  # readable by uid 185
+      - ./document-templates:/opt/patmas/document-templates:ro  # readable by uid 185
+    healthcheck:
+      # readiness on the management interface (port 9000, not published; docs/OPERATIONS.md)
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:9000/q/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s  # Liquibase and meta-model load before readiness turns UP
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24  # fixed, so the gateway address in QUARKUS_HTTP_PROXY_TRUSTED_PROXIES is known
