@@ -1,17 +1,6 @@
-## A modern Patent Management System
+## Patmas onboarding docs
 
-- highly flexible (custom code and custom fields)
-- web-based
-- AI-native
-- fast
-
-To meet the requirements of your firm and your customers.
-
-<br>
-
-expect more. soon.
-
-Nov 2026
+Last update: 17.11.2026
 
 ### Content
 
