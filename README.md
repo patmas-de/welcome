@@ -4,7 +4,7 @@ Last update: 17.11.2026
 
 ### Content
 
-This git repo and folder is to serve your onboarding with [Patmas](www.patmas.de)
+This git repo and folder is to serve your onboarding with [Patmas](https://patmas.de)
 
  Document                                                           | What it covers                                    |
 |--------------------------------------------------------------------|---------------------------------------------------|
